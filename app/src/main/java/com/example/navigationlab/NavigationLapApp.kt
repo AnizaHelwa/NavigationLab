@@ -9,19 +9,24 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.navigationlab.data.remote.RetrofitClient
+import com.example.navigationlab.data.remote.StudentRemoteDataSource
 import com.example.navigationlab.data.repository.DefaultStudentRepository
-import com.example.navigationlab.data.source.StudentLocalDataSource
 import com.example.navigationlab.ui.detail.DetailViewModel
+import com.example.navigationlab.ui.home.HomeViewModel
 import com.example.navigationlab.ui.screen.AboutScreen
 import com.example.navigationlab.ui.screen.DetailScreen
 import com.example.navigationlab.ui.screen.HomeScreen
 import com.example.navigationlab.ui.screen.ProfileScreen
-import com.example.navigationlab.ui.home.HomeViewModel
 
 @Composable
 fun NavigationLabApp() {
-    val dataSource = remember { StudentLocalDataSource() }
-    val repository = remember { DefaultStudentRepository(dataSource) }
+    val remoteDataSource = remember {
+        StudentRemoteDataSource(RetrofitClient.apiService)
+    }
+    val repository = remember {
+        DefaultStudentRepository(remoteDataSource)
+    }
     val navController = rememberNavController()
 
     NavHost(
@@ -33,15 +38,12 @@ fun NavigationLabApp() {
                 factory = HomeViewModel.factory(repository)
             )
 
-            LaunchedEffect(Unit) {
-                homeViewModel.loadStudents()
-            }
-
             HomeScreen(
                 uiState = homeViewModel.uiState,
                 onOpenDetail = { id -> navController.navigate(Routes.detail(id)) },
                 onOpenProfile = { navController.navigate(Routes.PROFILE) },
-                onOpenAbout = { navController.navigate(Routes.ABOUT) }
+                onOpenAbout = { navController.navigate(Routes.ABOUT) },
+                onRetry = homeViewModel::loadStudents
             )
         }
 
@@ -51,7 +53,7 @@ fun NavigationLabApp() {
                 navArgument("studentId") { type = NavType.IntType }
             )
         ) { backStackEntry ->
-            val studentId = backStackEntry.arguments?.getInt("studentId") ?: -1
+            val studentId = backStackEntry.arguments?.getInt("studentId") ?: 0
 
             val viewModel: DetailViewModel = viewModel(
                 factory = DetailViewModel.factory(repository)
@@ -63,7 +65,8 @@ fun NavigationLabApp() {
 
             DetailScreen(
                 uiState = viewModel.uiState,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onOpenProfile = { navController.navigate(Routes.PROFILE) }
             )
         }
 

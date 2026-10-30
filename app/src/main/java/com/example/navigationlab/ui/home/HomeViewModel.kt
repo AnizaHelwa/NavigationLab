@@ -14,8 +14,24 @@ class HomeViewModel(
     var uiState by mutableStateOf(HomeUiState())
         private set
 
+    init {
+        loadStudents()
+    }
+
     fun loadStudents() {
-        uiState = HomeUiState(students = repository.getStudents())
+        uiState = uiState.copy(isLoading = true, errorMessage = null)
+
+        repository.getStudents { result ->
+            result
+                .onSuccess { data ->
+                    uiState = HomeUiState(students = data)
+                }
+                .onFailure { error ->
+                    uiState = HomeUiState(
+                        errorMessage = error.message ?: "Gagal mengambil data"
+                    )
+                }
+        }
     }
 
     companion object {
