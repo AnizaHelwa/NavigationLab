@@ -17,6 +17,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,6 +29,8 @@ import com.example.navigationlab.ui.home.HomeUiState
 @Composable
 fun HomeScreen(
     uiState: HomeUiState,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
     onOpenDetail: (Int) -> Unit,
     onOpenProfile: () -> Unit,
     onOpenAbout: () -> Unit,
@@ -46,6 +49,25 @@ fun HomeScreen(
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 16.dp)
         )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = uiState.searchQuery,
+                onValueChange = onQueryChange,
+                label = { Text("Cari nama") },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            Button(onClick = onSearch) {
+                Text("Cari")
+            }
+        }
 
         when {
             uiState.isLoading -> {
@@ -81,15 +103,23 @@ fun HomeScreen(
                 }
             }
 
+            uiState.students.isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Tidak ada hasil")
+                }
+            }
+
             else -> {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(
-                        10.dp,
-                        Alignment.CenterVertically
-                    )
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(uiState.students, key = { it.id }) { student ->
                         Card(

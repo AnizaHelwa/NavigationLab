@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.navigationlab.data.repository.StudentRepository
+import com.example.navigationlab.data.model.Student
 
 class HomeViewModel(
     private val repository: StudentRepository
@@ -18,20 +19,37 @@ class HomeViewModel(
         loadStudents()
     }
 
+    fun onQueryChange(newQuery: String) {
+        uiState = uiState.copy(searchQuery = newQuery)
+    }
+
+    fun search() {
+        val query = uiState.searchQuery.trim()
+        if (query.isEmpty()) {
+            loadStudents()
+        } else {
+            uiState = uiState.copy(isLoading = true, errorMessage = null)
+            repository.searchStudents(query) { result -> handleResult(result) }
+        }
+    }
+
     fun loadStudents() {
         uiState = uiState.copy(isLoading = true, errorMessage = null)
+        repository.getStudents { result -> handleResult(result) }
+    }
 
-        repository.getStudents { result ->
-            result
-                .onSuccess { data ->
-                    uiState = HomeUiState(students = data)
-                }
-                .onFailure { error ->
-                    uiState = HomeUiState(
-                        errorMessage = error.message ?: "Gagal mengambil data"
-                    )
-                }
-        }
+    private fun handleResult(result: Result<List<Student>>) {
+        result
+            .onSuccess { data ->
+                uiState = uiState.copy(students = data, isLoading = false)
+            }
+            .onFailure { error ->
+                uiState = uiState.copy(
+                    students = emptyList(),
+                    isLoading = false,
+                    errorMessage = error.message ?: "Gagal mengambil data"
+                )
+            }
     }
 
     companion object {
