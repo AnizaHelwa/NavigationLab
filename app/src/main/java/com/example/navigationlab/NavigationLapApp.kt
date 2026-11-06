@@ -18,6 +18,8 @@ import com.example.navigationlab.ui.screen.AboutScreen
 import com.example.navigationlab.ui.screen.DetailScreen
 import com.example.navigationlab.ui.screen.HomeScreen
 import com.example.navigationlab.ui.screen.ProfileScreen
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun NavigationLabApp() {
@@ -37,15 +39,17 @@ fun NavigationLabApp() {
             val homeViewModel: HomeViewModel = viewModel(
                 factory = HomeViewModel.factory(repository)
             )
+            val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+            val searchQuery by homeViewModel.searchQuery.collectAsStateWithLifecycle()
 
             HomeScreen(
-                uiState = homeViewModel.uiState,
-                onQueryChange = homeViewModel::onQueryChange,
-                onSearch = homeViewModel::search,
+                uiState = homeUiState,
+                searchQuery = searchQuery,
+                onSearchQueryChange = homeViewModel::onSearchQueryChange,
                 onOpenDetail = { id -> navController.navigate(Routes.detail(id)) },
                 onOpenProfile = { navController.navigate(Routes.PROFILE) },
                 onOpenAbout = { navController.navigate(Routes.ABOUT) },
-                onRetry = homeViewModel::search
+                onRetry = homeViewModel::retry
             )
         }
 
@@ -60,13 +64,14 @@ fun NavigationLabApp() {
             val viewModel: DetailViewModel = viewModel(
                 factory = DetailViewModel.factory(repository)
             )
+            val detailUiState by viewModel.uiState.collectAsStateWithLifecycle()
 
             LaunchedEffect(studentId) {
                 viewModel.loadStudent(studentId)
             }
 
             DetailScreen(
-                uiState = viewModel.uiState,
+                uiState = detailUiState,
                 onBack = { navController.popBackStack() },
                 onOpenProfile = { navController.navigate(Routes.PROFILE) }
             )
