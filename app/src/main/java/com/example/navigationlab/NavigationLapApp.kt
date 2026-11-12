@@ -46,6 +46,7 @@ fun NavigationLabApp() {
                 uiState = homeUiState,
                 searchQuery = searchQuery,
                 onSearchQueryChange = homeViewModel::onSearchQueryChange,
+                onRefresh = homeViewModel::refresh,
                 onOpenDetail = { id -> navController.navigate(Routes.detail(id)) },
                 onOpenProfile = { navController.navigate(Routes.PROFILE) },
                 onOpenAbout = { navController.navigate(Routes.ABOUT) },

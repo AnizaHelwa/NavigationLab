@@ -31,6 +31,7 @@ fun HomeScreen(
     uiState: HomeUiState,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
+    onRefresh: () -> Unit,
     onOpenDetail: (Int) -> Unit,
     onOpenProfile: () -> Unit,
     onOpenAbout: () -> Unit,
@@ -50,22 +51,22 @@ fun HomeScreen(
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        Row(
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChange,
+            label = { Text("Cari profil") },
+            singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(bottom = 12.dp)
+        )
+
+        OutlinedButton(
+            onClick = onRefresh,
+            enabled = !uiState.isLoading,
+            modifier = Modifier.padding(bottom = 12.dp)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                label = { Text("Cari profil") },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-            )
+            Text("Refresh")
         }
 
         when {

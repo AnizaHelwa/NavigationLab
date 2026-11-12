@@ -6,12 +6,16 @@ import androidx.lifecycle.viewModelScope
 import com.example.navigationlab.data.repository.StudentRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
@@ -24,77 +28,59 @@ class HomeViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    // Sinyal "muat ulang sekarang" dari tombol Refresh dan Coba Lagi
+    private val refreshTrigger = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+
     init {
-        observeSearch()
+        observeRequests()
     }
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
     }
 
-    @OptIn(FlowPreview::class)
-    private fun observeSearch() {
+    fun refresh() {
         viewModelScope.launch {
-            searchQuery
-                .debounce(500)
-                .distinctUntilChanged()
-                .collectLatest { query ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = true,
-                        errorMessage = null
-                    )
-                    try {
-                        val data = if (query.isBlank()) {
-                            repository.getStudents()
-                        } else {
-                            repository.searchStudents(query)
-                        }
-                        _uiState.value = HomeUiState(students = data)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        _uiState.value = HomeUiState(
-                            errorMessage = e.message ?: "Pencarian gagal"
-                        )
-                    }
-                }
-        }
-    }
-
-    fun loadStudents() {
-        viewModelScope.launch {
-            _uiState.value = HomeUiState(isLoading = true)
-            try {
-                val students = repository.getStudents()
-                _uiState.value = HomeUiState(students = students)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _uiState.value = HomeUiState(
-                    errorMessage = e.message ?: "Gagal mengambil data"
-                )
-            }
+            refreshTrigger.emit(Unit)
         }
     }
 
     fun retry() {
-        val query = searchQuery.value
+        refresh()
+    }
+
+    @OptIn(FlowPreview::class)
+    private fun observeRequests() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            try {
-                val data = if (query.isBlank()) {
-                    repository.getStudents()
-                } else {
-                    repository.searchStudents(query)
-                }
-                _uiState.value = HomeUiState(students = data)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _uiState.value = HomeUiState(
-                    errorMessage = e.message ?: "Request gagal"
-                )
+            merge(
+                searchQuery
+                    .debounce(500)
+                    .distinctUntilChanged(),
+                refreshTrigger.map { searchQuery.value }
+            ).collectLatest { query ->
+                fetchStudents(query)
             }
+        }
+    }
+
+    private suspend fun fetchStudents(query: String) {
+        _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+        try {
+            val data = if (query.isBlank()) {
+                repository.getStudents()
+            } else {
+                repository.searchStudents(query)
+            }
+            _uiState.value = HomeUiState(students = data)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _uiState.value = HomeUiState(
+                errorMessage = e.message ?: "Request gagal"
+            )
         }
     }
 
