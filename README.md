@@ -2,20 +2,26 @@
 
 Aplikasi Android multi-screen berbasis **Jetpack Compose** yang dikembangkan bertahap pada praktikum mata kuliah **Pemrograman Aplikasi Perangkat Bergerak (CIF62041)**, S1 Teknik Informatika, Fakultas Ilmu Komputer, Universitas Brawijaya.
 
-Repository ini memuat hasil **Modul Praktikum 06 (Arsitektur Aplikasi Android)** dan **Modul Praktikum 07 (REST API & Retrofit)** pada project yang sama. Modul 06 merapikan struktur aplikasi menjadi berlapis, lalu Modul 07 mengganti sumber data lokal menjadi data dari REST API tanpa mengubah banyak bagian UI.
+Repository ini memuat hasil tiga modul pada project yang sama:
+
+| Modul | Topik | Inti perubahan |
+|---|---|---|
+| **06** | Arsitektur Aplikasi Android | Memisahkan UI layer dan data layer (ViewModel, repository, data source) |
+| **07** | REST API dan Retrofit | Mengganti data in-memory dengan data dari REST API memakai Retrofit callback |
+| **08** | Kotlin Coroutines dan Flow | Mengganti callback dengan `suspend`, `StateFlow`, dan pencarian reaktif berbasis Flow |
 
 ---
 
 ## Identitas
 
-| Keterangan | Isi |
-|---|---|
-| Nama | Aniza Helwa |
-| NIM | *(isi NIM)* |
-| Kelas | *(isi kelas)* |
+| Keterangan | Isi                                                |
+|---|----------------------------------------------------|
+| Nama | Aniza Helwa                                        |
+| NIM | *245150201111043*                                  |
+| Kelas | *D*                                                |
 | Mata kuliah | Pemrograman Aplikasi Perangkat Bergerak (CIF62041) |
-| Modul | 06 (Arsitektur Android) dan 07 (REST API & Retrofit) |
-| Repository | https://github.com/AnizaHelwa/NavigationLab |
+| Modul | 06, 07, dan 08                                     |
+| Repository | https://github.com/AnizaHelwa/NavigationLab        |
 
 ---
 
@@ -26,23 +32,26 @@ Repository ini memuat hasil **Modul Praktikum 06 (Arsitektur Aplikasi Android)**
 3. [Arsitektur](#arsitektur)
 4. [Struktur Project](#struktur-project)
 5. [Alur Data](#alur-data)
-6. [REST API yang Digunakan](#rest-api-yang-digunakan)
-7. [Cara Menjalankan](#cara-menjalankan)
-8. [Penjelasan Per Modul](#penjelasan-per-modul)
-9. [Pengujian](#pengujian)
-10. [Screenshot](#screenshot)
-11. [Troubleshooting](#troubleshooting)
-12. [Riwayat Commit](#riwayat-commit)
-13. [Referensi](#referensi)
+6. [Konsep Coroutines dan Flow yang Dipakai](#konsep-coroutines-dan-flow-yang-dipakai)
+7. [REST API yang Digunakan](#rest-api-yang-digunakan)
+8. [Cara Menjalankan](#cara-menjalankan)
+9. [Penjelasan Per Modul](#penjelasan-per-modul)
+10. [Tugas Praktikum Modul 08: Refresh](#tugas-praktikum-modul-08-refresh)
+11. [Pengujian](#pengujian)
+12. [Screenshot](#screenshot)
+13. [Troubleshooting](#troubleshooting)
+14. [Riwayat Commit](#riwayat-commit)
+15. [Referensi](#referensi)
 
 ---
 
 ## Fitur
 
-- **Home**: menampilkan daftar profil mahasiswa dari REST API (DummyJSON), lengkap dengan nama dan ID.
-- **Pencarian**: kolom pencarian dan tombol **Cari**. Pencarian hanya berjalan saat tombol ditekan (tanpa debounce). Jika kolom kosong, tombol Cari memuat kembali daftar awal.
+- **Home**: daftar profil dari REST API (DummyJSON) dengan nama dan ID.
+- **Pencarian reaktif**: mengetik di kolom pencarian langsung memicu pencarian setelah pengguna berhenti mengetik sekitar 500 ms, tanpa tombol Cari.
+- **Refresh**: tombol untuk memuat ulang data. Jika kolom kosong, daftar awal dimuat; jika berisi teks, pencarian diulang dengan query aktif.
 - **Detail**: menampilkan nama, ID, email, dan university dari profil yang dipilih.
-- **Loading state**: indikator `CircularProgressIndicator` saat data diminta.
+- **Loading state**: indikator putar saat data diminta.
 - **Error state**: pesan error dan tombol **Coba Lagi** ketika request gagal (misalnya internet mati), tanpa crash.
 - **Empty state**: teks "Tidak ada hasil" ketika pencarian tidak menemukan data.
 - **Navigasi**: Home, Detail, Profile, dan About dengan Navigation Compose, termasuk argument `studentId` dan tombol Kembali.
@@ -56,13 +65,14 @@ Repository ini memuat hasil **Modul Praktikum 06 (Arsitektur Aplikasi Android)**
 | Bahasa | Kotlin |
 | UI | Jetpack Compose + Material 3 |
 | Navigasi | Navigation Compose |
-| State holder | `ViewModel` dengan `mutableStateOf` |
-| HTTP client | Retrofit 3.0.0 |
+| State holder | `ViewModel` dengan `MutableStateFlow` / `StateFlow` |
+| Pola asinkron | Kotlin Coroutines (`suspend`, `viewModelScope`) dan Flow |
+| Koleksi state di UI | `collectAsStateWithLifecycle()` |
+| HTTP client | Retrofit 3.0.0 (suspend function) |
 | JSON converter | Gson (`converter-gson` 3.0.0) |
-| Pola asinkron | Retrofit callback (`Call.enqueue`) |
+| Coroutines | `kotlinx-coroutines-android` 1.11.0 |
+| Lifecycle | `lifecycle-viewmodel-ktx`, `lifecycle-viewmodel-compose`, `lifecycle-runtime-compose` 2.9.4 |
 | Sumber data | [DummyJSON](https://dummyjson.com/docs/users) |
-
-> Modul ini sengaja memakai callback agar fokus pada REST, JSON, dan arsitektur data. Pada materi berikutnya implementasi network akan direfactor dengan Kotlin Coroutines dan Flow.
 
 ---
 
@@ -71,38 +81,39 @@ Repository ini memuat hasil **Modul Praktikum 06 (Arsitektur Aplikasi Android)**
 Aplikasi memakai arsitektur berlapis dengan prinsip **separation of concerns**. UI tidak pernah mengakses sumber data secara langsung.
 
 ```
-UI Layer              State Holder         Data Layer
------------------     ----------------     -----------------------------------------------
-HomeScreen       -->  HomeViewModel   -->  StudentRepository (interface)
-DetailScreen     -->  DetailViewModel      DefaultStudentRepository
-                                              |
-                                              v
-                                           StudentRemoteDataSource
-                                              |
-                                              v
-                                           StudentApiService (Retrofit)
-                                              |
-                                              v
-                                           REST API (DummyJSON)
+UI Layer                State Holder              Data Layer
+---------------------   -----------------------   ------------------------------------------
+HomeScreen         <--  HomeViewModel        -->  StudentRepository (interface)
+DetailScreen       <--  DetailViewModel           DefaultStudentRepository
+ (collectAsState-       (viewModelScope,              |  suspend
+  WithLifecycle)         StateFlow)                   v
+                                                  StudentRemoteDataSource
+                                                      |  suspend
+                                                      v
+                                                  StudentApiService (Retrofit)
+                                                      |
+                                                      v
+                                                  REST API (DummyJSON)
 ```
 
-Tanggung jawab tiap komponen:
+**Event bergerak ke dalam, state bergerak ke luar.** UI mengirim event (ketik, klik, refresh) ke ViewModel, dan ViewModel mengembalikan state yang dikoleksi UI.
 
 | Komponen | Tanggung jawab |
 |---|---|
-| **Composable screen** | Menampilkan state dan mengirim event. Tidak memuat data langsung. |
-| **ViewModel** | Memegang UI state tingkat layar, menangani event, dan memanggil repository. |
+| **Composable screen** | Menampilkan state dan mengirim event. Tidak memuat data dan tidak membuat coroutine. |
+| **ViewModel** | Memegang UI state sebagai `StateFlow`, menjalankan coroutine lewat `viewModelScope`, dan memanggil repository. |
 | **Repository** | Satu pintu akses data. Memetakan DTO menjadi model aplikasi. |
-| **Remote data source** | Berkomunikasi dengan API dan membungkus hasil dalam `Result`. |
-| **Retrofit service** | Mendefinisikan endpoint HTTP sebagai interface Kotlin. |
+| **Remote data source** | Memanggil API dan mengembalikan DTO. Kegagalan dilempar sebagai exception. |
+| **Retrofit service** | Mendefinisikan endpoint sebagai `suspend fun`. |
 | **DTO** | Bentuk data yang mengikuti struktur JSON dari API. |
-| **Model** | Bentuk data yang dipakai aplikasi (`Student`), tidak bergantung pada UI maupun API. |
+| **Model** | `Student`, bentuk data yang dipakai aplikasi. |
 
 ### Aturan dependency
 
-- `HomeScreen` dan `DetailScreen` hanya mengenal `UiState` dan callback. Keduanya **tidak mengimpor** Retrofit, `StudentApiService`, `RetrofitClient`, maupun remote data source.
-- ViewModel hanya bergantung pada interface `StudentRepository`, bukan implementasi konkretnya. Ia juga tidak mengimpor `NavController` atau composable UI.
-- Perakitan dependency dilakukan manual di `NavigationLabApp` (tanpa framework dependency injection): `RetrofitClient` → `StudentRemoteDataSource` → `DefaultStudentRepository` → ViewModel.
+- `HomeScreen` dan `DetailScreen` hanya mengenal `UiState` dan callback. Keduanya **tidak mengimpor** Retrofit, `StudentApiService`, `RetrofitClient`, repository, maupun `kotlinx.coroutines`, dan tidak membuat `CoroutineScope`.
+- ViewModel hanya bergantung pada interface `StudentRepository`. Ia tidak mengimpor `NavController` atau composable.
+- Seluruh coroutine memakai `viewModelScope`. Tidak ada `GlobalScope`.
+- Dependency dirakit manual di `NavigationLabApp`: `RetrofitClient` → `StudentRemoteDataSource` → `DefaultStudentRepository` → ViewModel (lewat factory).
 
 ---
 
@@ -112,21 +123,21 @@ Tanggung jawab tiap komponen:
 com.example.navigationlab/
 ├── data/
 │   ├── model/
-│   │   └── Student.kt                  # model aplikasi: id, name, email, university
+│   │   └── Student.kt                  # id, name, email, university
 │   ├── remote/
 │   │   ├── dto/
 │   │   │   ├── UserDto.kt              # DTO + mapper toStudent()
-│   │   │   └── UserResponse.kt         # wrapper response: users, total, skip, limit
-│   │   ├── StudentApiService.kt        # endpoint Retrofit (@GET, @Query, @Path)
-│   │   ├── RetrofitClient.kt           # singleton Retrofit + Gson converter
-│   │   └── StudentRemoteDataSource.kt  # request via enqueue, hasil dalam Result
+│   │   │   └── UserResponse.kt         # users, total, skip, limit
+│   │   ├── StudentApiService.kt        # endpoint Retrofit (suspend)
+│   │   ├── RetrofitClient.kt           # singleton Retrofit + Gson
+│   │   └── StudentRemoteDataSource.kt  # suspend fun getStudents/getStudent/searchStudents
 │   └── repository/
-│       ├── StudentRepository.kt        # interface kontrak akses data
+│       ├── StudentRepository.kt        # interface (suspend)
 │       └── DefaultStudentRepository.kt # implementasi, memetakan DTO ke Student
 ├── ui/
 │   ├── home/
 │   │   ├── HomeUiState.kt
-│   │   └── HomeViewModel.kt
+│   │   └── HomeViewModel.kt            # searchQuery, refresh, retry, observeRequests
 │   ├── detail/
 │   │   ├── DetailUiState.kt
 │   │   └── DetailViewModel.kt
@@ -143,19 +154,48 @@ com.example.navigationlab/
 
 ## Alur Data
 
-Contoh: pengguna membuka Home.
+### Memuat dan mencari data
 
-1. `HomeViewModel` dibuat dan `init` memanggil `loadStudents()`.
-2. ViewModel mengubah state menjadi `isLoading = true`, lalu memanggil `repository.getStudents(...)`.
-3. `DefaultStudentRepository` meneruskan permintaan ke `StudentRemoteDataSource`.
-4. `StudentRemoteDataSource` menjalankan `StudentApiService.getUsers()` dengan `enqueue`.
-5. Response JSON diubah Gson menjadi `UserResponse`, lalu list `UserDto` dibungkus `Result.success`.
-6. Repository memetakan `UserDto` menjadi `Student` lewat `toStudent()`.
-7. ViewModel memperbarui `uiState`, dan `HomeScreen` merender daftar mahasiswa.
+Contoh: pengguna mengetik `john`.
 
-Jika request gagal (tidak ada internet atau HTTP error), `Result.failure` diteruskan sampai ViewModel dan UI menampilkan pesan error beserta tombol **Coba Lagi**.
+1. Kolom pencarian memanggil `onSearchQueryChange`, yang diteruskan ke `HomeViewModel.onSearchQueryChange()`.
+2. ViewModel mengubah `searchQuery` (`MutableStateFlow`).
+3. Di `observeRequests()`, aliran query melewati `debounce(500)` dan `distinctUntilChanged()`, lalu masuk ke `collectLatest`.
+4. `fetchStudents(query)` menyalakan `isLoading`, lalu memanggil `repository.searchStudents("john")` (atau `getStudents()` jika query kosong).
+5. Repository memanggil remote data source, lalu Retrofit. Coroutine ditangguhkan sampai response datang.
+6. Response diubah Gson menjadi DTO, lalu dipetakan menjadi `Student`.
+7. ViewModel mengisi `uiState`. `HomeScreen` mengoleksinya lewat `collectAsStateWithLifecycle()` dan digambar ulang.
+8. Jika gagal, exception ditangkap dan `uiState` berisi `errorMessage`, sehingga UI menampilkan pesan dan tombol **Coba Lagi**.
 
-Prinsipnya: **event bergerak ke dalam, state bergerak ke luar**.
+### Refresh dan Coba Lagi
+
+Tombol **Refresh** dan **Coba Lagi** tidak memulai request sendiri. Keduanya hanya mengirim sinyal ke `refreshTrigger`. Sinyal itu digabung (`merge`) dengan aliran query pencarian dan diproses oleh **satu** `collectLatest`. Akibatnya pencarian otomatis, Coba Lagi, dan Refresh memakai jalur yang sama, dan hanya satu pekerjaan yang aktif pada satu waktu.
+
+---
+
+## Konsep Coroutines dan Flow yang Dipakai
+
+| Konsep | Penjelasan singkat | Dipakai di |
+|---|---|---|
+| `suspend` | Menandai fungsi yang boleh ditangguhkan tanpa memblokir thread. Hanya bisa dipanggil dari coroutine atau fungsi suspend lain. | `StudentApiService`, remote data source, repository |
+| `viewModelScope` | Scope bawaan ViewModel. Coroutine dibatalkan otomatis saat ViewModel dibersihkan. | `HomeViewModel`, `DetailViewModel` |
+| `MutableStateFlow` / `StateFlow` | State yang selalu punya nilai terbaru. Versi mutable disimpan private, UI menerima versi read-only lewat `asStateFlow()`. | `uiState`, `searchQuery` |
+| `collectAsStateWithLifecycle()` | Mengubah StateFlow menjadi State Compose dan berhenti mengoleksi saat UI tidak aktif. | `NavigationLabApp` |
+| `debounce(500)` | Meneruskan query hanya setelah pengguna berhenti mengetik 500 ms. | `observeRequests()` |
+| `distinctUntilChanged()` | Mengabaikan query yang sama dengan sebelumnya. | `observeRequests()` |
+| `collectLatest` | Membatalkan pekerjaan lama jika nilai baru datang, sehingga hanya hasil terbaru yang diproses. | `observeRequests()` |
+| `merge` + `MutableSharedFlow` | Menggabungkan sinyal tombol (Refresh, Coba Lagi) dengan aliran query ke satu pipeline. | `observeRequests()` |
+| `CancellationException` | Sinyal pembatalan coroutine, bukan error. Ditangkap terpisah dan dilempar kembali. | `fetchStudents()`, `DetailViewModel` |
+
+### Mencegah race condition
+
+Pada pencarian yang mengirim request bersamaan, response yang selesai paling akhir bisa menimpa hasil query yang lebih baru. Pada project ini pencegahannya berlapis:
+
+1. `debounce` mengurangi jumlah request yang dikirim.
+2. `distinctUntilChanged` menghindari request identik.
+3. `collectLatest` membatalkan request lama saat permintaan baru datang, sehingga hasil lama tidak pernah sempat menimpa hasil baru.
+4. Refresh dan Coba Lagi dialirkan ke `collectLatest` yang sama, sehingga mereka juga saling membatalkan dengan pencarian otomatis.
+5. `CancellationException` dilempar kembali agar pembatalan benar-benar efektif dan tidak tampil sebagai error palsu.
 
 ---
 
@@ -163,13 +203,13 @@ Prinsipnya: **event bergerak ke dalam, state bergerak ke luar**.
 
 Base URL: `https://dummyjson.com/`
 
-| Method | Endpoint | Kegunaan | Dipakai oleh |
+| Method | Endpoint | Kegunaan | Fungsi |
 |---|---|---|---|
 | GET | `users?limit=10` | Daftar 10 profil awal | `getUsers()` |
 | GET | `users/{id}` | Detail satu profil | `getUser(id)` |
 | GET | `users/search?q={kata}` | Pencarian profil | `searchUsers(query)` |
 
-Field JSON yang dipetakan ke DTO: `id`, `firstName`, `lastName`, `email`, `university`. Field lain diabaikan. Model aplikasi menggabungkan `firstName` dan `lastName` menjadi `name`.
+Field JSON yang dipetakan ke DTO: `id`, `firstName`, `lastName`, `email`, `university`. Model aplikasi menggabungkan `firstName` dan `lastName` menjadi `name`.
 
 Contoh uji di browser:
 
@@ -178,7 +218,7 @@ https://dummyjson.com/users?limit=10
 https://dummyjson.com/users/search?q=John
 ```
 
-> Data DummyJSON berisi nama berbahasa Inggris. Untuk mencoba pencarian, gunakan kata seperti `John`, `Emily`, atau `Michael`.
+> Data DummyJSON berisi nama berbahasa Inggris. Untuk mencoba pencarian, gunakan kata seperti `john`, `emily`, atau `michael`.
 
 ---
 
@@ -187,7 +227,6 @@ https://dummyjson.com/users/search?q=John
 ### Prasyarat
 
 - Android Studio versi terbaru
-- JDK sesuai bawaan Android Studio
 - Emulator atau perangkat Android dengan **koneksi internet**
 
 ### Langkah
@@ -197,12 +236,12 @@ https://dummyjson.com/users/search?q=John
    git clone https://github.com/AnizaHelwa/NavigationLab.git
    ```
 2. Buka folder project di Android Studio.
-3. Tunggu **Gradle Sync** selesai. Library Retrofit dan Gson diunduh otomatis, jadi komputer harus terhubung internet.
+3. Tunggu **Gradle Sync** selesai (library diunduh otomatis, jadi komputer harus terhubung internet).
 4. Pilih emulator atau perangkat, lalu klik **Run**.
 
 ### Konfigurasi penting
 
-Permission internet sudah ditambahkan di `AndroidManifest.xml`:
+Permission internet di `AndroidManifest.xml`:
 
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
@@ -213,7 +252,13 @@ Dependency pada `app/build.gradle.kts`:
 ```kotlin
 implementation("com.squareup.retrofit2:retrofit:3.0.0")
 implementation("com.squareup.retrofit2:converter-gson:3.0.0")
+implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4")
+implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
+implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
 ```
+
+Gunakan **satu** versi Lifecycle yang konsisten. Jangan menduplikasi versi berbeda dalam satu project.
 
 ---
 
@@ -223,56 +268,87 @@ implementation("com.squareup.retrofit2:converter-gson:3.0.0")
 
 Tujuan: merapikan struktur aplikasi agar tanggung jawab UI, state, akses data, dan sumber data tidak bercampur.
 
-Yang dikerjakan:
-
-- Membuat struktur package `data` dan `ui`.
+- Membuat package `data` dan `ui`.
 - Membuat model `Student` dan `StudentLocalDataSource` (data in-memory).
 - Membuat `StudentRepository` (interface) dan `DefaultStudentRepository`.
 - Membuat `DetailUiState` dan `DetailViewModel` dengan factory.
 - Mengubah `DetailScreen` menjadi UI murni yang hanya menerima `uiState` dan callback.
-- Merakit dependency secara manual di `NavigationLabApp`.
-- **Tugas**: daftar mahasiswa di Home melalui `getStudents()`, `HomeUiState`, dan `HomeViewModel`. Klik item membuka Detail berdasarkan ID, dan `HomeScreen` tidak mengakses data source atau repository secara langsung.
+- Merakit dependency manual di `NavigationLabApp`.
+- **Tugas**: daftar mahasiswa di Home lewat `getStudents()`, `HomeUiState`, dan `HomeViewModel`.
 
 ### Modul 07: REST API dan Retrofit
 
-Tujuan: mengganti sumber data in-memory dengan REST API eksternal sambil mempertahankan arsitektur Modul 06.
-
-Yang dikerjakan:
+Tujuan: mengganti sumber data in-memory dengan REST API sambil mempertahankan arsitektur Modul 06.
 
 - Menambahkan permission INTERNET dan dependency Retrofit + Gson.
 - Membuat DTO (`UserDto`, `UserResponse`) dan mapper `toStudent()`.
-- Mengubah model `Student` dari `program` dan `year` menjadi `email` dan `university`.
-- Membuat `StudentApiService`, `RetrofitClient`, dan `StudentRemoteDataSource`.
+- Mengubah model `Student` menjadi `id`, `name`, `email`, `university`.
+- Membuat `StudentApiService`, `RetrofitClient`, dan `StudentRemoteDataSource` (callback `enqueue`).
 - Mengubah repository menjadi asinkron berbasis callback.
-- Menambahkan loading dan error state pada ViewModel dan UI.
-- Menghapus `StudentLocalDataSource` lama karena tidak dipakai lagi.
-- **Tugas**: fitur pencarian profil lewat endpoint `users/search` (TextField, tombol Cari, dan state `searchQuery`), dengan loading dan error state yang sama.
+- Menambahkan loading dan error state, lalu menghapus `StudentLocalDataSource`.
+- **Tugas**: pencarian profil lewat endpoint `users/search` dengan tombol Cari.
+
+### Modul 08: Kotlin Coroutines dan Flow
+
+Tujuan: mengubah pola callback menjadi coroutine agar kode lebih linear, mudah dibaca, dan mengikuti lifecycle.
+
+- **Dependency**: menambahkan `kotlinx-coroutines-android` dan Lifecycle 2.9.4, serta menyamakan versi Lifecycle.
+- **Retrofit service**: seluruh endpoint menjadi `suspend` dan return type `Call<T>` diganti tipe data langsung.
+- **Remote data source**: kode `enqueue`, `onResponse`, dan `onFailure` dihapus, tersisa tiga fungsi `suspend` pendek.
+- **Repository**: semua fungsi menjadi `suspend` tanpa callback dan tanpa pembungkus `Result`.
+- **ViewModel**: `mutableStateOf` diganti `MutableStateFlow` private yang diekspos sebagai `StateFlow`. Pekerjaan dijalankan lewat `viewModelScope.launch`, error ditangani `try/catch`.
+- **Compose**: state dikoleksi dengan `collectAsStateWithLifecycle()`.
+- **Pencarian reaktif**: `searchQuery` menjadi `StateFlow` dan diproses `debounce`, `distinctUntilChanged`, dan `collectLatest`. Tombol Cari dihapus.
+- **Retry**: tombol Coba Lagi mengulang request sesuai query aktif.
+
+---
+
+## Tugas Praktikum Modul 08: Refresh
+
+| No | Ketentuan | Implementasi |
+|---|---|---|
+| 1 | Tombol Refresh di HomeScreen | `OutlinedButton` "Refresh" di bawah kolom pencarian, nonaktif saat loading |
+| 2 | Tombol memanggil `refresh()` | `onRefresh = homeViewModel::refresh` di `NavigationLabApp` |
+| 3 | `refresh()` memakai `viewModelScope.launch` | `viewModelScope.launch { refreshTrigger.emit(Unit) }` |
+| 4 | Query kosong memuat daftar awal | `fetchStudents()`: `if (query.isBlank()) getStudents()` |
+| 5 | Query berisi mengulang pencarian | Sinyal refresh membawa `searchQuery.value`, lalu `searchStudents(query)` |
+| 6 | `isLoading` dan `errorMessage` benar | Diatur pada satu fungsi, `fetchStudents()` |
+| 7 | Tanpa `CoroutineScope` baru di HomeScreen | HomeScreen hanya memanggil callback `onRefresh` |
+| 8 | Tanpa `GlobalScope` | Semua coroutine memakai `viewModelScope` |
+| 9 | Detail dan Back tetap berjalan | Destination Detail tidak diubah, `HomeViewModel` bertahan di back stack |
+| 10 | Screenshot sebelum dan sesudah Refresh | Lihat bagian [Screenshot](#screenshot) |
+
+Rancangan penting: `refresh()` hanya mengirim sinyal, sedangkan request dijalankan di `observeRequests()` lewat `collectLatest`. Dengan begitu Refresh, Coba Lagi, dan pencarian otomatis tidak bisa saling menimpa hasilnya.
 
 ---
 
 ## Pengujian
 
-Pengujian dilakukan secara manual pada emulator.
+Pengujian dilakukan manual pada emulator.
 
 | No | Skenario | Hasil yang diharapkan |
 |---|---|---|
 | 1 | Gradle Sync | Berhasil tanpa error |
 | 2 | Membuka Home | Loading muncul, lalu 10 profil dari API tampil |
 | 3 | Klik salah satu profil | Detail menampilkan name, email, dan university |
-| 4 | Tombol Kembali | Kembali ke Home |
-| 5 | Cari `John` | Hanya profil yang cocok tampil |
-| 6 | Kosongkan kolom lalu Cari | Daftar awal kembali |
-| 7 | Cari kata yang tidak ada (`zzzz`) | Muncul "Tidak ada hasil" |
-| 8 | Internet dimatikan | Error state tampil tanpa crash |
-| 9 | Internet dinyalakan lalu Coba Lagi | Request diulang dan data tampil |
-| 10 | Profile dan About | Tetap dapat dibuka dan kembali |
-| 11 | Cek batas layer | `HomeScreen` dan `DetailScreen` tidak mengimpor Retrofit, `StudentApiService`, atau `RetrofitClient` |
+| 4 | Tombol Kembali | Kembali ke Home, daftar dan teks pencarian tetap |
+| 5 | Ketik `john` lalu diam sekitar 1 detik | Hasil terfilter otomatis tanpa tombol Cari |
+| 6 | Ketik cepat `j`, `jo`, `joh`, `john` | Hanya query terakhir yang diproses |
+| 7 | Kosongkan kolom pencarian | Daftar awal dimuat kembali |
+| 8 | Cari kata yang tidak ada (`zzzz`) | Muncul "Tidak ada hasil" |
+| 9 | Tekan Refresh, kolom kosong | Daftar awal dimuat ulang |
+| 10 | Tekan Refresh, kolom berisi `john` | Pencarian `john` diulang |
+| 11 | Internet dimatikan lalu Refresh | Error state tampil tanpa crash |
+| 12 | Internet dinyalakan lalu Coba Lagi | Request diulang sesuai query aktif dan data tampil |
+| 13 | Refresh lalu buka Detail dan Kembali | Home tetap normal tanpa crash |
+| 14 | Profile dan About | Tetap dapat dibuka dan kembali |
+| 15 | Cek batas layer | Tidak ada `GlobalScope`, `enqueue`, `Callback`, atau `Call<` di project, dan `HomeScreen` tidak mengimpor Retrofit, repository, atau coroutine |
 
 ---
 
 ## Screenshot
 
-> Ganti nama file di bawah dengan screenshot milikmu, lalu simpan di folder `docs/screenshots/`.
+> Ganti nama file di bawah dengan screenshot milikmu, lalu simpan di folder `docs/screenshots/`. Hapus bagian ini jika tidak memasang gambar.
 
 ### Modul 06
 
@@ -296,7 +372,21 @@ Pengujian dilakukan secara manual pada emulator.
 | Error state saat internet mati | ![Error state](docs/screenshots/m07_error_state.png) |
 | Kembali ke Home setelah Detail | ![Back](docs/screenshots/m07_back_home.png) |
 | Hasil pencarian | ![Pencarian](docs/screenshots/m07_pencarian.png) |
-| Bukti UI tidak memanggil `StudentApiService` / `RetrofitClient` | ![Bukti layer](docs/screenshots/m07_bukti_layer.png) |
+
+### Modul 08
+
+| Keterangan | Gambar |
+|---|---|
+| `StudentApiService` berisi suspend function | ![API service](docs/screenshots/m08_01_api_service_suspend.png) |
+| `HomeViewModel` dengan StateFlow dan viewModelScope | ![HomeViewModel](docs/screenshots/m08_02_homeviewmodel_stateflow.png) |
+| Home menampilkan data awal API | ![Home](docs/screenshots/m08_03_home_data_awal.png) |
+| Pencarian reaktif setelah debounce | ![Pencarian](docs/screenshots/m08_04_pencarian_reaktif.png) |
+| Detail hasil REST API | ![Detail](docs/screenshots/m08_05_detail_api.png) |
+| Error state saat internet dimatikan | ![Error](docs/screenshots/m08_06_error_state.png) |
+| Aplikasi tetap berjalan setelah retry | ![Retry](docs/screenshots/m08_07_setelah_retry.png) |
+| Sebelum Refresh | ![Sebelum Refresh](docs/screenshots/m08_08_sebelum_refresh.png) |
+| Sesudah Refresh | ![Sesudah Refresh](docs/screenshots/m08_09_sesudah_refresh.png) |
+| Loading saat Refresh (opsional) | ![Loading](docs/screenshots/m08_10_loading_saat_refresh.png) |
 
 ---
 
@@ -308,12 +398,17 @@ Pengujian dilakukan secara manual pada emulator.
 | `HTTP 404` | Periksa base URL, path `@GET`, `@Path`, dan ID yang diminta. |
 | `Expected BEGIN_OBJECT` / parsing error | DTO tidak sesuai struktur JSON. Periksa nama property. |
 | Crash `baseUrl must end in /` | `BASE_URL` di `RetrofitClient` harus diakhiri `/`. |
-| Layar kosong | Periksa response body, parameter `limit` atau `q`. |
-| `Unresolved reference: viewModel` | Tambahkan dependency `lifecycle-viewmodel-compose` dan import `androidx.lifecycle.viewmodel.compose.viewModel`. |
-| `Unresolved reference: Student` di ViewModel | Tambahkan import `com.example.navigationlab.data.model.Student`. |
-| `Argument type mismatch` di data source lama | Model `Student` sudah berubah. Hapus `StudentLocalDataSource.kt`. |
-| UI tidak berubah | Pastikan ViewModel mengubah `uiState` (Compose state) setelah callback selesai. |
-| Request terkirim dua kali | Jangan panggil `loadStudents()` di `LaunchedEffect` jika sudah ada di `init` ViewModel. |
+| `Unresolved reference: collectAsStateWithLifecycle` | Tambahkan `lifecycle-runtime-compose` dan import `androidx.lifecycle.compose.collectAsStateWithLifecycle`. |
+| `Unresolved reference: viewModelScope` | Pastikan `lifecycle-viewmodel-ktx` tersedia dan import `androidx.lifecycle.viewModelScope`. |
+| `Suspend function can be called only within coroutine` | Panggil fungsi suspend dari `viewModelScope.launch` atau fungsi suspend lain. |
+| Request terkirim dua kali saat dibuka | Pastikan `init` hanya memanggil `observeRequests()` dan tidak ada pemanggilan pemuatan data lain. |
+| `Unresolved reference: merge` / `map` | Impor dari `kotlinx.coroutines.flow`. |
+| Peringatan `FlowPreview` | Tambahkan `@OptIn(FlowPreview::class)` di atas fungsi yang memakai `debounce`. |
+| Pesan "error" muncul saat request diganti | `CancellationException` harus ditangkap terpisah dan dilempar kembali (`throw e`) sebelum `catch (e: Exception)`. |
+| Tombol Refresh tidak muncul | Pastikan `OutlinedButton` ada di `HomeScreen.kt` di luar blok `when`, lalu jalankan ulang aplikasi (Run, bukan Apply Changes). |
+| `No value passed for parameter 'onRefresh'` | Tambahkan `onRefresh = homeViewModel::refresh` pada pemanggilan `HomeScreen`. |
+| UI tidak berubah | Pastikan ViewModel mengubah `_uiState.value` dan UI mengoleksi dengan `collectAsStateWithLifecycle`. |
+| `git push` ditolak (`fetch first`) | Remote punya commit yang belum ada lokal. Jalankan `git pull --rebase origin main`, lalu `git push`. |
 
 ---
 
@@ -322,10 +417,11 @@ Pengujian dilakukan secara manual pada emulator.
 | Commit | Isi |
 |---|---|
 | `Selesai Modul 06` | Arsitektur berlapis dengan data in-memory dan daftar mahasiswa di Home |
-| `Selesai Modul 07: REST API dan Retrofit` | Integrasi Retrofit, DTO, remote data source, loading dan error state |
-| `Tugas Modul 07: fitur pencarian` | Pencarian profil lewat endpoint `users/search` |
+| `Selesai Modul 07: REST API dan Retrofit` | Retrofit callback, DTO, remote data source, loading dan error state |
+| `Tugas Modul 07: fitur pencarian` | Pencarian profil dengan tombol Cari |
+| `Modul 08: coroutines, flow, dan fitur refresh` | Suspend function, StateFlow, pencarian reaktif, dan fitur Refresh |
 
-Untuk melihat kode Modul 06, buka commit `Selesai Modul 06` di tab **Commits** lalu pilih **Browse files** (atau gunakan tag `modul-06` jika sudah dibuat).
+Untuk melihat kode modul sebelumnya, buka commit terkait di tab **Commits** lalu pilih **Browse files**.
 
 ---
 
@@ -334,7 +430,9 @@ Untuk melihat kode Modul 06, buka commit `Selesai Modul 06` di tab **Commits** l
 1. Android Developers. *Guide to app architecture*. https://developer.android.com/topic/architecture
 2. Android Developers. *ViewModel overview*. https://developer.android.com/topic/libraries/architecture/viewmodel
 3. Android Developers. *Data layer*. https://developer.android.com/topic/architecture/data-layer
-4. Android Developers. *Get data from the internet*. https://developer.android.com/develop/connectivity/network-ops/connecting
-5. Square. *Retrofit, a type-safe HTTP client for Android and Java*. https://square.github.io/retrofit/
-6. DummyJSON. *Users REST API documentation*. https://dummyjson.com/docs/users
-7. Modul Praktikum 06 dan 07, Pemrograman Aplikasi Perangkat Bergerak (CIF62041), FILKOM Universitas Brawijaya, 2026.
+4. Android Developers. *Best practices for coroutines in Android*. https://developer.android.com/kotlin/coroutines/coroutines-best-practices
+5. Android Developers. *Use Kotlin coroutines with lifecycle-aware components*. https://developer.android.com/topic/libraries/architecture/coroutines
+6. Android Developers. *StateFlow and SharedFlow*. https://developer.android.com/kotlin/flow/stateflow-and-sharedflow
+7. Square. *Retrofit, a type-safe HTTP client for Android and Java*. https://square.github.io/retrofit/
+8. DummyJSON. *Users REST API documentation*. https://dummyjson.com/docs/users
+9. Modul Praktikum 06, 07, dan 08, Pemrograman Aplikasi Perangkat Bergerak (CIF62041), FILKOM Universitas Brawijaya, 2026.
