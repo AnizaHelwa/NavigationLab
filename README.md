@@ -9,6 +9,7 @@ Repository ini memuat hasil tiga modul pada project yang sama:
 | **06** | Arsitektur Aplikasi Android | Memisahkan UI layer dan data layer (ViewModel, repository, data source) |
 | **07** | REST API dan Retrofit | Mengganti data in-memory dengan data dari REST API memakai Retrofit callback |
 | **08** | Kotlin Coroutines dan Flow | Mengganti callback dengan `suspend`, `StateFlow`, dan pencarian reaktif berbasis Flow |
+| **09** | Persistensi Data Lokal | Mengimplementasikan Room Database untuk fitur Favorites dan DataStore Preferences untuk menyimpan preferensi pengguna |
 
 ---
 
@@ -55,6 +56,11 @@ Repository ini memuat hasil tiga modul pada project yang sama:
 - **Error state**: pesan error dan tombol **Coba Lagi** ketika request gagal (misalnya internet mati), tanpa crash.
 - **Empty state**: teks "Tidak ada hasil" ketika pencarian tidak menemukan data.
 - **Navigasi**: Home, Detail, Profile, dan About dengan Navigation Compose, termasuk argument `studentId` dan tombol Kembali.
+- **Favorites**: pengguna dapat menyimpan dan menghapus mahasiswa favorit melalui DetailScreen.
+- **FavoritesScreen**: menampilkan daftar mahasiswa favorit yang tersimpan di Room Database, meliputi nama dan email.
+- **Sinkronisasi data favorit**: daftar favorit diperbarui secara otomatis melalui Flow ketika data ditambahkan atau dihapus, tanpa refresh manual.
+- **Preferensi pengurutan**: pengguna dapat mengatur urutan nama mahasiswa secara ascending (A–Z) atau descending (Z–A).
+- **Persistensi preferensi**: riwayat pencarian terakhir dan preferensi pengurutan disimpan menggunakan DataStore sehingga tetap tersedia setelah aplikasi dimulai ulang.
 
 ---
 
@@ -73,6 +79,9 @@ Repository ini memuat hasil tiga modul pada project yang sama:
 | Coroutines | `kotlinx-coroutines-android` 1.11.0 |
 | Lifecycle | `lifecycle-viewmodel-ktx`, `lifecycle-viewmodel-compose`, `lifecycle-runtime-compose` 2.9.4 |
 | Sumber data | [DummyJSON](https://dummyjson.com/docs/users) |
+| Database lokal | Room Persistence Library |
+| Penyimpanan preferensi | DataStore Preferences |
+| Pemrosesan kode database | Kotlin Symbol Processing (KSP) |
 
 ---
 
@@ -301,6 +310,19 @@ Tujuan: mengubah pola callback menjadi coroutine agar kode lebih linear, mudah d
 - **Pencarian reaktif**: `searchQuery` menjadi `StateFlow` dan diproses `debounce`, `distinctUntilChanged`, dan `collectLatest`. Tombol Cari dihapus.
 - **Retry**: tombol Coba Lagi mengulang request sesuai query aktif.
 
+### Modul 09: Persistensi Data Lokal dengan Room dan DataStore
+
+Tujuan: mengimplementasikan penyimpanan data lokal secara persisten menggunakan Room Database dan DataStore Preferences.
+
+- **Room Database**: menambahkan `FavoriteStudentEntity` sebagai representasi tabel mahasiswa favorit.
+- **DAO**: membuat `FavoriteStudentDao` untuk menyediakan operasi penyimpanan, penghapusan, dan observasi data favorit.
+- **Database**: membuat `AppDatabase` sebagai konfigurasi database Room dengan nama `navigation_lab.db`.
+- **Repository**: membuat `FavoriteRepository` sebagai perantara antara ViewModel dan DAO.
+- **FavoritesViewModel**: mengamati daftar mahasiswa favorit melalui Flow dan mengubahnya menjadi StateFlow.
+- **FavoritesScreen**: menampilkan mahasiswa favorit beserta nama dan email. Item yang dipilih dapat membuka DetailScreen.
+- **Sinkronisasi otomatis**: perubahan data favorit pada DetailScreen langsung tercermin di FavoritesScreen melalui Flow dari Room.
+- **DataStore Preferences**: menambahkan preferensi `sortAscending` untuk mengatur urutan nama mahasiswa secara A–Z atau Z–A.
+- **Persistensi preferensi**: menyimpan pilihan pengurutan dan riwayat pencarian agar tetap tersedia setelah aplikasi ditutup dan dibuka kembali.
 ---
 
 ## Tugas Praktikum Modul 08: Refresh
@@ -343,6 +365,13 @@ Pengujian dilakukan manual pada emulator.
 | 13 | Refresh lalu buka Detail dan Kembali | Home tetap normal tanpa crash |
 | 14 | Profile dan About | Tetap dapat dibuka dan kembali |
 | 15 | Cek batas layer | Tidak ada `GlobalScope`, `enqueue`, `Callback`, atau `Call<` di project, dan `HomeScreen` tidak mengimpor Retrofit, repository, atau coroutine |
+| 16 | Menyimpan mahasiswa sebagai favorit | Data mahasiswa berhasil disimpan ke Room Database |
+| 17 | Membuka FavoritesScreen | Daftar mahasiswa favorit menampilkan nama dan email |
+| 18 | Menghapus mahasiswa favorit dari DetailScreen | Data pada FavoritesScreen otomatis diperbarui |
+| 19 | Menekan item mahasiswa pada FavoritesScreen | Aplikasi membuka DetailScreen mahasiswa terkait |
+| 20 | Mengubah urutan menjadi A–Z atau Z–A | Daftar mahasiswa diurutkan sesuai preferensi |
+| 21 | Menutup dan membuka kembali aplikasi | Preferensi pengurutan tetap tersimpan |
+| 22 | Menguji riwayat pencarian setelah restart | Query pencarian terakhir berhasil dipulihkan |
 
 ---
 
@@ -420,6 +449,7 @@ Pengujian dilakukan manual pada emulator.
 | `Selesai Modul 07: REST API dan Retrofit` | Retrofit callback, DTO, remote data source, loading dan error state |
 | `Tugas Modul 07: fitur pencarian` | Pencarian profil dengan tombol Cari |
 | `Modul 08: coroutines, flow, dan fitur refresh` | Suspend function, StateFlow, pencarian reaktif, dan fitur Refresh |
+| `Modul 09: Room Database dan DataStore` | Implementasi FavoritesScreen, penyimpanan mahasiswa favorit menggunakan Room, serta preferensi pengurutan dan riwayat pencarian menggunakan DataStore |
 
 Untuk melihat kode modul sebelumnya, buka commit terkait di tab **Commits** lalu pilih **Browse files**.
 
@@ -436,3 +466,5 @@ Untuk melihat kode modul sebelumnya, buka commit terkait di tab **Commits** lalu
 7. Square. *Retrofit, a type-safe HTTP client for Android and Java*. https://square.github.io/retrofit/
 8. DummyJSON. *Users REST API documentation*. https://dummyjson.com/docs/users
 9. Modul Praktikum 06, 07, dan 08, Pemrograman Aplikasi Perangkat Bergerak (CIF62041), FILKOM Universitas Brawijaya, 2026.
+10. Android Developers. *Save data in a local database using Room*. https://developer.android.com/training/data-storage/room
+11. Android Developers. *DataStore*. https://developer.android.com/topic/libraries/architecture/datastore

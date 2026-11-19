@@ -16,20 +16,28 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.navigationlab.ui.detail.DetailUiState
 
+
 @Composable
 fun DetailScreen(
     uiState: DetailUiState,
     onBack: () -> Unit,
-    onOpenProfile: () -> Unit
+    onOpenProfile: () -> Unit,
+    onToggleFavorite: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(
+            12.dp,
+            Alignment.CenterVertically
+        ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Detail Student", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            "Detail Student",
+            style = MaterialTheme.typography.headlineMedium
+        )
 
         when {
             uiState.isLoading -> {
@@ -44,12 +52,27 @@ fun DetailScreen(
                 )
             }
 
-            else -> {
-                uiState.student?.let { data ->
-                    Text(data.name, style = MaterialTheme.typography.headlineSmall)
-                    Text("ID: ${data.id}")
-                    Text("Email: ${data.email}")
-                    Text("University: ${data.university}")
+            uiState.student != null -> {
+                val data = uiState.student
+
+                Text(
+                    data.name,
+                    style = MaterialTheme.typography.headlineSmall
+                )
+                Text("ID: ${data.id}")
+                Text("Email: ${data.email}")
+                Text("University: ${data.university}")
+
+                Button(
+                    onClick = onToggleFavorite
+                ) {
+                    Text(
+                        text = if (uiState.isFavorite) {
+                            "Hapus dari Favorit"
+                        } else {
+                            "Simpan ke Favorit"
+                        }
+                    )
                 }
             }
         }
@@ -57,6 +80,7 @@ fun DetailScreen(
         OutlinedButton(onClick = onOpenProfile) {
             Text("Buka Profile")
         }
+
         Button(onClick = onBack) {
             Text("Kembali")
         }

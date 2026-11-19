@@ -35,6 +35,7 @@ fun HomeScreen(
     onOpenDetail: (Int) -> Unit,
     onOpenProfile: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenFavorites: () -> Unit,
     onRetry: () -> Unit
 ) {
     Column(
@@ -155,9 +156,19 @@ fun HomeScreen(
             OutlinedButton(onClick = onOpenProfile) {
                 Text("Buka Profile")
             }
+
             OutlinedButton(onClick = onOpenAbout) {
                 Text("Buka About")
             }
+        }
+
+        OutlinedButton(
+            onClick = onOpenFavorites,
+            modifier = Modifier
+                .fillMaxWidth(0.8f)
+                .padding(top = 16.dp)
+        ) {
+            Text("Mahasiswa Favorit")
         }
     }
 }

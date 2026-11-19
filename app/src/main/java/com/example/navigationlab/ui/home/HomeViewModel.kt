@@ -17,9 +17,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
+import com.example.navigationlab.data.preferences.UserPreferencesRepository
+import kotlinx.coroutines.flow.first
 
 class HomeViewModel(
-    private val repository: StudentRepository
+    private val repository: StudentRepository,
+    private val preferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
@@ -35,7 +38,17 @@ class HomeViewModel(
     )
 
     init {
-        observeRequests()
+        viewModelScope.launch {
+            // 1. Mengambil query terakhir dari DataStore
+            _searchQuery.value =
+                preferencesRepository.lastSearchQuery.first()
+
+            // 2. Menjalankan proses pencarian
+            observeRequests()
+        }
+
+        // 3. Menyimpan perubahan query secara otomatis
+        observeSearchQueryChanges()
     }
 
     fun onSearchQueryChange(query: String) {
@@ -66,6 +79,18 @@ class HomeViewModel(
         }
     }
 
+    @OptIn(FlowPreview::class)
+    private fun observeSearchQueryChanges() {
+        viewModelScope.launch {
+            searchQuery
+                .debounce(500)
+                .distinctUntilChanged()
+                .collectLatest { value ->
+                    preferencesRepository.saveLastSearchQuery(value)
+                }
+        }
+    }
+
     private suspend fun fetchStudents(query: String) {
         _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
         try {
@@ -85,11 +110,17 @@ class HomeViewModel(
     }
 
     companion object {
-        fun factory(repository: StudentRepository): ViewModelProvider.Factory =
+        fun factory(
+            repository: StudentRepository,
+            preferencesRepository: UserPreferencesRepository
+        ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return HomeViewModel(repository) as T
+                    return HomeViewModel(
+                        repository,
+                        preferencesRepository
+                    ) as T
                 }
             }
     }
